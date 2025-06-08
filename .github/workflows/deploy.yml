@@ -81,7 +81,7 @@ jobs:
           script: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get install -y git
-            git clone https://github.com/${{ github.repository }}.git /root/private-ai
+            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone https://github.com/${{ github.repository }}.git /root/private-ai
             cd /root/private-ai
 
       - name: Deploy Docker Stack on Droplet
