@@ -37,6 +37,9 @@ resource "digitalocean_droplet" "private_ai_server" {
               usermod -aG docker ubuntu
               systemctl restart docker
               sleep 10
+              ufw allow ssh
+              ufw allow 5678/tcp
+              ufw --force enable
               EOF
 }
 
