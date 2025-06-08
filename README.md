@@ -46,9 +46,28 @@ L'action GitHub se chargera de :
 3. Déployer les services n8n, Ollama et ChromaDB via Docker Compose.
 4. Télécharger le modèle `llama3:8b` dans Ollama.
 
----
+Une fois le déploiement terminé (environ 5 minutes), l'adresse IP de votre serveur sera affichée dans les logs du workflow GitHub Actions.
 
-## Comment Utiliser
+### ⚠️ Étape Manuelle Importante : Configuration du Pare-feu
+
+Pour des raisons de robustesse du déploiement automatisé, le pare-feu du serveur n'est pas activé par défaut. Vous **devez** vous connecter au serveur après le premier déploiement pour l'activer.
+
+1.  Récupérez l'adresse IP de votre serveur depuis les logs du workflow.
+2.  Connectez-vous en SSH :
+    ```bash
+    ssh root@VOTRE_ADRESSE_IP
+    ```
+3.  Activez le pare-feu avec les bonnes règles :
+    ```bash
+    ufw allow ssh
+    ufw allow 5678/tcp
+    ufw enable
+    ```
+    Vous devrez confirmer l'opération en tapant `y`.
+
+## 🚀 Utilisation
+
+Une fois le déploiement et la configuration du pare-feu terminés, votre instance "Private Document AI" est prête.
 
 ### 1. Accéder à n8n
 Une fois le déploiement terminé, consultez les logs de l'action GitHub pour trouver l'adresse IP de votre Droplet. Accédez à n8n dans votre navigateur via :

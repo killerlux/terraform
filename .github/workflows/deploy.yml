@@ -105,19 +105,6 @@ jobs:
               echo "Deployment complete."
             else
               echo "Executing custom command: ${{ github.event.inputs.command }}"
+              cd /root/private-ai
               /usr/bin/docker compose ${{ github.event.inputs.command }}
             fi
-
-      - name: Configure and Enable Firewall
-        if: success()
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ needs.build.outputs.droplet_ip }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "Configuring firewall..."
-            ufw allow ssh
-            ufw allow 5678/tcp
-            ufw enable
-            echo "Firewall enabled."
