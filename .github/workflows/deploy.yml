@@ -69,7 +69,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            if [ "${{ github.event.inputs.command }}" = "deploy" ]; then
+            if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.command }}" = "deploy" ]; then
               export N8N_HOST=${{ needs.build.outputs.droplet_ip }}
               
               cd /root
@@ -80,9 +80,9 @@ jobs:
               sleep 30
 
               echo "Pulling Llama3 model in Ollama..."
-              /usr/bin/docker exec ollama_service ollama pull llama3:8b
+              docker exec ollama_service ollama pull llama3:8b
               echo "Deployment complete."
             else
               echo "Executing custom command: ${{ github.event.inputs.command }}"
-              /usr/bin/${{ github.event.inputs.command }}
+              ${{ github.event.inputs.command }}
             fi
