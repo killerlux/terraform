@@ -1,5 +1,10 @@
 # Private Document AI
 
+## Statut du Déploiement
+[![Deploy Private AI Stack to DigitalOcean](https://github.com/killerlux/terraform/actions/workflows/deploy.yml/badge.svg)](https://github.com/killerlux/terraform/actions/workflows/deploy.yml)
+
+**Le système a été déployé avec succès !**
+
 Ce projet est une application complète permettant de chatter avec des documents privés, construite avec n8n, Ollama, et ChromaDB, et déployée sur DigitalOcean via Terraform et GitHub Actions.
 
 ## Architecture
@@ -68,3 +73,6 @@ Activez les deux workflows en utilisant l'interrupteur en haut à droite de l'é
 ### 5. Utiliser l'Application
 - **Pour ingérer un document :** Envoyez une requête `POST` avec votre fichier (ex: via Postman ou un autre script) au webhook d'ingestion : `http://<VOTRE_IP_DE_DROPLET>:5678/webhook/ingest-document`.
 - **Pour chatter avec vos documents :** Ouvrez le workflow "Document Q&A Chat", cliquez sur le bouton "Open Chat" en bas de l'écran et commencez à poser des questions.
+
+---
+*Ce README a été mis à jour automatiquement après le déploiement réussi.*

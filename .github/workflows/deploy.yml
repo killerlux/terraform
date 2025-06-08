@@ -62,11 +62,11 @@ jobs:
             
             cd /root
             echo "Starting docker services..."
-            docker-compose up -d
+            /usr/local/bin/docker-compose up -d
             
             echo "Waiting for services to start..."
             sleep 30
 
             echo "Pulling Llama3 model in Ollama..."
-            docker exec ollama_service ollama pull llama3:8b
+            /usr/bin/docker exec ollama_service ollama pull llama3:8b
             echo "Deployment complete."
