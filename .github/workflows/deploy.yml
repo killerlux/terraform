@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Optional command to run on the server'
+        required: false
+        default: 'deploy'
 
 jobs:
   build:
@@ -58,15 +64,20 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            export N8N_HOST=${{ needs.build.outputs.droplet_ip }}
-            
-            cd /root
-            echo "Starting docker services..."
-            /usr/local/bin/docker-compose up -d
-            
-            echo "Waiting for services to start..."
-            sleep 30
+            if [ "${{ github.event.inputs.command }}" = "deploy" ]; then
+              export N8N_HOST=${{ needs.build.outputs.droplet_ip }}
+              
+              cd /root
+              echo "Starting docker services..."
+              /usr/local/bin/docker-compose up -d
+              
+              echo "Waiting for services to start..."
+              sleep 30
 
-            echo "Pulling Llama3 model in Ollama..."
-            /usr/bin/docker exec ollama_service ollama pull llama3:8b
-            echo "Deployment complete."
+              echo "Pulling Llama3 model in Ollama..."
+              /usr/bin/docker exec ollama_service ollama pull llama3:8b
+              echo "Deployment complete."
+            else
+              echo "Executing custom command: ${{ github.event.inputs.command }}"
+              ${{ github.event.inputs.command }}
+            fi
