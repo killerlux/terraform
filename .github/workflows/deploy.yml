@@ -119,5 +119,5 @@ jobs:
             echo "Configuring firewall..."
             ufw allow ssh
             ufw allow 5678/tcp
-            ufw --force enable
+            ufw enable
             echo "Firewall enabled."
