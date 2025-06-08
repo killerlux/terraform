@@ -57,9 +57,10 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Pausing for manual inspection. SSH into ${{ needs.build.outputs.droplet_ip }} as root."
-            echo "The machine will be destroyed in 10 minutes."
-            sleep 600
+            echo "Installing Docker using the official script..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sh get-docker.sh
+            echo "Docker installed successfully."
 
       - name: Save Droplet IP as artifact
         run: |
