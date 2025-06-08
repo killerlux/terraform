@@ -25,7 +25,8 @@ jobs:
           terraform init
           terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
           
-          DROPLET_IP=$(terraform output -raw droplet_ip_address)
+          terraform output -raw droplet_ip_address > /tmp/droplet_ip.txt
+          DROPLET_IP=$(head -n 1 /tmp/droplet_ip.txt)
           echo "DROPLET_IP=$DROPLET_IP" >> $GITHUB_ENV
         
       - name: Copy Docker Compose file to Droplet
