@@ -50,17 +50,35 @@ jobs:
           echo "Waiting for 60 seconds for the server to boot up..."
           sleep 60
 
-      - name: Install Docker and Docker Compose
+      - name: Install Docker Engine and Compose
         uses: appleboy/ssh-action@master
         with:
           host: ${{ needs.build.outputs.droplet_ip }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Installing Docker using the official script..."
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sh get-docker.sh
-            echo "Docker installed successfully."
+            export DEBIAN_FRONTEND=noninteractive
+            # Add Docker's official GPG key:
+            apt-get update
+            apt-get install -y ca-certificates curl
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+
+            # Add the repository to Apt sources:
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+              tee /etc/apt/sources.list.d/docker.list > /dev/null
+            apt-get update
+
+            echo "Installing Docker packages..."
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+            echo "Verifying installation..."
+            docker --version
+            docker compose version
+            echo "Docker and Docker Compose installed successfully."
 
       - name: Save Droplet IP as artifact
         run: |
@@ -93,16 +111,16 @@ jobs:
             cd /root/private-ai
             if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.command }}" = "deploy" ]; then
               echo "Starting docker services..."
-              /usr/bin/docker compose up -d
+              docker compose up -d
               
               echo "Waiting for services to start..."
               sleep 30
 
               echo "Pulling Llama3 model in Ollama..."
-              /usr/bin/docker exec ollama_service ollama pull llama3:8b
+              docker exec ollama_service ollama pull llama3:8b
               echo "Deployment complete."
             else
               echo "Executing custom command: ${{ github.event.inputs.command }}"
               cd /root/private-ai
-              /usr/bin/docker compose ${{ github.event.inputs.command }}
+              docker compose ${{ github.event.inputs.command }}
             fi
