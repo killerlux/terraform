@@ -1,0 +1,48 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+5.2. Remplir le fichier n8n_workflows/qa_workflow.json
+
+Remplis ce fichier avec le JSON suivant.
+
+      
+{
+  "name": "Document Q&A Chat",
+  "nodes": [
+    {
+      "parameters": { "options": {} },
+      "id": "0d207a97-9e73-4f9e-a61a-289b418e24c7", "name": "Chat Trigger", "type": "n8n-nodes-base.chatTrigger", "typeVersion": 1, "position": [ 620, 320 ]
+    },
+    {
+      "parameters": { "url": "http://ollama:11434/api/embeddings", "sendBody": true, "bodyParameters": { "jsonBody": "={{ { \"model\": \"llama3:8b\", \"prompt\": $json.text } }}" }, "options": {} },
+      "id": "e9e8f470-3d84-4860-93c4-e67c8702c288", "name": "Embed User Question", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [ 860, 320 ]
+    },
+    {
+      "parameters": { "authentication": "predefinedCredentialType", "nodeCredentialType": "chromaDbApi", "operation": "query", "collection": "private_docs", "options": { "queryEmbeddings": [ "={{ $json.embedding }}" ], "limit": 3 } },
+      "id": "a9c2c62c-8069-425f-8d2b-6c4a45a35368", "name": "Search Relevant Chunks", "type": "n8n-nodes-partners.chromaDb", "typeVersion": 1, "position": [ 1100, 320 ]
+    },
+    {
+      "parameters": { "values": { "string": [ { "name": "context", "value": "={{ $json.documents.join('\\n---\\n') }}" }, { "name": "question", "value": "={{ $('Chat Trigger').item.json.text }}" } ] }, "options": {} },
+      "id": "f29b9e6e-2144-436f-8a03-9d0a68d0c26c", "name": "Prepare Context", "type": "n8n-nodes-base.set", "typeVersion": 4.1, "position": [ 1340, 320 ]
+    },
+    {
+      "parameters": { "url": "http://ollama:11434/api/generate", "sendBody": true, "bodyParameters": { "jsonBody": "={{ { \"model\": \"llama3:8b\", \"stream\": false, \"prompt\": \"Based ONLY on the following context, answer the user's question. Context:\\n\" + $json.context + \"\\n\\n---\\n\\nQuestion:\\n\" + $json.question + \"\\n\\nIf the context does not contain the answer, state that you could not find the information in the provided documents.\" } }}" }, "options": {} },
+      "id": "e8d9c22d-3d4c-474c-8f9f-7e0e7a25035f", "name": "Generate Answer", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [ 1580, 320 ]
+    },
+    {
+      "parameters": { "values": { "string": [ { "name": "text", "value": "={{ JSON.parse($json.response).response }}" } ] }, "options": { "keepOnlySet": true } },
+      "id": "d1c25a07-1b0a-42d1-9b19-c081e74f88e1", "name": "Format for Chat", "type": "n8n-nodes-base.set", "typeVersion": 4.1, "position": [ 1820, 320 ]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": { "main": [ [ { "node": "Embed User Question", "type": "main", "index": 0 } ] ] },
+    "Embed User Question": { "main": [ [ { "node": "Search Relevant Chunks", "type": "main", "index": 0 } ] ] },
+    "Search Relevant Chunks": { "main": [ [ { "node": "Prepare Context", "type": "main", "index": 0 } ] ] },
+    "Prepare Context": { "main": [ [ { "node": "Generate Answer", "type": "main", "index": 0 } ] ] },
+    "Generate Answer": { "main": [ [ { "node": "Format for Chat", "type": "main", "index": 0 } ] ] }
+  }
+}
+
+    

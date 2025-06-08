@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# .cursorules - Guide de Construction Complet pour "Private Document AI"
+
+## 🎯 Objectif du Projet
+Construire une application complète et auto-hébergée permettant aux utilisateurs de "chatter" avec leurs propres documents. Le système doit être privé, sécurisé, et déployé sur DigitalOcean. L'automatisation du déploiement via GitHub Actions est essentielle.
+Tu as accès au mcp de Github 
+
+## 🏛️ Principes d'Architecture
+- **Monorepo :** Tous les composants (infrastructure, backend, workflows) seront dans un seul et même dépôt Git pour faciliter la gestion et la cohérence.
+- **Infrastructure as Code (IaC) :** Nous utiliserons Terraform pour définir et provisionner notre serveur sur DigitalOcean de manière reproductible.
+- **Conteneurisation :** Tous les services (n8n, Ollama, ChromaDB) seront exécutés dans des conteneurs Docker, orchestrés par un unique fichier `docker-compose.yml`.
+- **CI/CD :** Un pipeline GitHub Actions automatisera le déploiement. Chaque `push` sur la branche `main` mettra à jour l'infrastructure et redéployera les applications.
+- **Documentation Continue :** Tu généreras et maintiendras une documentation claire dans le `README.md` au fur et à mesure de la construction du projet.
+
+---
+
+##  PHASE 1 : Initialisation du Projet et Structure
+
+### 1.1. Créer la structure du Monorepo
+Crée les répertoires et fichiers suivants à la racine du projet :
+- `.github/workflows/deploy.yml`
+- `terraform/main.tf`
+- `n8n_workflows/ingestion_workflow.json`
+- `n8n_workflows/qa_workflow.json`
+- `docker-compose.yml`
+- `.gitignore`
+- `README.md`
+
+### 1.2. Remplir le fichier .gitignore
+Remplis `.gitignore` avec le contenu suivant :
+```.gitignore
+# Fichiers de configuration locaux
+.env
+*.tfstate
+*.tfstate.backup
+
+# Fichiers Terraform
+.terraform/
+terraform.tfvars
+
+# Logs et dépendances
+node_modules
+npm-debug.log
+*.log
+
+# Fichiers système
+.DS_Store

@@ -1,0 +1,36 @@
+{
+  "name": "Document Ingestion",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "ingest-document", "responseMode": "usingRespondToWebhookNode", "options": { "binaryData": true } },
+      "id": "764ea075-802c-4b68-8098-9037c76a9c33", "name": "Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 1, "position": [ 600, 300 ]
+    },
+    {
+      "parameters": { "fileName": "={{ $binary.data.fileName }}", "options": {} },
+      "id": "8477742b-5f34-4b53-a7fa-31f08f889759", "name": "Read Binary File", "type": "n8n-nodes-base.readBinaryFile", "typeVersion": 1, "position": [ 820, 300 ]
+    },
+    {
+      "parameters": { "dataToSplit": "={{ $json.text }}", "mode": "splitText", "options": { "textSplitter": { "chunkSize": 500, "chunkOverlap": 50 } } },
+      "id": "e98e27aa-d912-4cf3-a1f7-414ec31f009e", "name": "Split In Batches", "type": "n8n-nodes-base.splitInBatches", "typeVersion": 2, "position": [ 1040, 300 ]
+    },
+    {
+      "parameters": { "url": "http://ollama:11434/api/embeddings", "sendBody": true, "bodyParameters": { "jsonBody": "={{ { \"model\": \"llama3:8b\", \"prompt\": $json.text } }}" }, "options": {} },
+      "id": "f516086f-a2e4-4c6e-8120-c9a9d700e008", "name": "Embed Chunk", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [ 1280, 300 ]
+    },
+    {
+      "parameters": { "authentication": "predefinedCredentialType", "nodeCredentialType": "chromaDbApi", "operation": "add", "collection": "private_docs", "options": { "embeddings": [ "={{ $json.embedding }}" ], "documents": [ "={{ $('Split In Batches').item.json.text }}" ] } },
+      "id": "e7b0a1d4-c9bb-432d-9495-2ab0cf1b72a6", "name": "Store in ChromaDB", "type": "n8n-nodes-partners.chromaDb", "typeVersion": 1, "position": [ 1500, 300 ]
+    },
+    {
+      "parameters": { "responseCode": "200", "body": "={\n  \"status\": \"success\",\n  \"message\": \"Document processed and stored successfully.\"\n}" },
+      "id": "ba425026-b51f-4d9f-939e-d710d5b3d683", "name": "Respond to Webhook", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1, "position": [ 1740, 300 ]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [ [ { "node": "Read Binary File", "type": "main", "index": 0 } ] ] },
+    "Read Binary File": { "main": [ [ { "node": "Split In Batches", "type": "main", "index": 0 } ] ] },
+    "Split In Batches": { "main": [ [ { "node": "Embed Chunk", "type": "main", "index": 0 } ] ] },
+    "Embed Chunk": { "main": [ [ { "node": "Store in ChromaDB", "type": "main", "index": 0 } ] ] },
+    "Store in ChromaDB": { "main": [ [ { "node": "Respond to Webhook", "type": "main", "index": 0 } ] ] }
+  }
+}

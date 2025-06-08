@@ -1,0 +1,65 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+PHASE 4 : Automatisation du Déploiement (CI/CD)
+4.1. Remplir le fichier .github/workflows/deploy.yml
+
+Remplis deploy.yml avec ce workflow GitHub Actions.
+
+      
+name: Deploy Private AI Stack to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Authenticate to DigitalOcean & Run Terraform
+        id: terraform_apply
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
+          
+          DROPLET_IP=$(terraform output -raw droplet_ip_address)
+          echo "DROPLET_IP=$DROPLET_IP" >> $GITHUB_ENV
+        
+      - name: Deploy Docker Compose to Droplet
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.DROPLET_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Copying docker-compose file..."
+            scp -o StrictHostKeyChecking=no ./docker-compose.yml root@${{ env.DROPLET_IP }}:/root/docker-compose.yml
+            
+            export N8N_HOST=${{ env.DROPLET_IP }}
+            
+            cd /root
+            echo "Starting docker services..."
+            docker-compose up -d
+            
+            echo "Waiting for services to start..."
+            sleep 30
+
+            echo "Pulling Llama3 model in Ollama..."
+            docker exec ollama_service ollama pull llama3:8b
+            echo "Deployment complete."
+
+    

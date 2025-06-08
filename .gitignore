@@ -1,0 +1,16 @@
+# Fichiers de configuration locaux
+.env
+*.tfstate
+*.tfstate.backup
+
+# Fichiers Terraform
+.terraform/
+terraform.tfvars
+
+# Logs et dépendances
+node_modules
+npm-debug.log
+*.log
+
+# Fichiers système
+.DS_Store
