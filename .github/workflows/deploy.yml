@@ -107,8 +107,17 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            export N8N_HOST=${{ needs.build.outputs.droplet_ip }}
             cd /root/private-ai
+            
+            # Create .env file for Docker Compose
+            echo "N8N_HOST=${{ needs.build.outputs.droplet_ip }}" > .env
+            echo "Created .env file with N8N_HOST"
+            
+            # Create data directory and set correct permissions for n8n
+            mkdir -p n8n_data
+            chown -R 1000:1000 n8n_data
+            echo "Set permissions for n8n data directory"
+
             if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.command }}" = "deploy" ]; then
               echo "Starting docker services..."
               docker compose up -d
@@ -121,6 +130,5 @@ jobs:
               echo "Deployment complete."
             else
               echo "Executing custom command: ${{ github.event.inputs.command }}"
-              cd /root/private-ai
               docker compose ${{ github.event.inputs.command }}
             fi
