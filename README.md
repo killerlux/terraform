@@ -58,6 +58,117 @@
 - SSH key pair configured in DigitalOcean
 - GitHub repository with Actions enabled
 
+### **🔑 SSH Key Setup Guide**
+
+Before deploying, you need to set up SSH keys for secure server access. Follow this step-by-step guide:
+
+#### **Step 1: Generate SSH Key Pair**
+
+```bash
+# Generate a new SSH key pair specifically for this project
+ssh-keygen -t ed25519 -C "private-ai-deployment" -f ~/.ssh/private-ai
+
+# This creates two files:
+# ~/.ssh/private-ai      (private key - keep secret!)
+# ~/.ssh/private-ai.pub  (public key - safe to share)
+```
+
+**Alternative for older systems:**
+```bash
+# If ed25519 is not supported, use RSA
+ssh-keygen -t rsa -b 4096 -C "private-ai-deployment" -f ~/.ssh/private-ai
+```
+
+#### **Step 2: Add Public Key to DigitalOcean**
+
+1. **Display your public key:**
+   ```bash
+   cat ~/.ssh/private-ai.pub
+   ```
+
+2. **Copy the output** (starts with `ssh-ed25519` or `ssh-rsa`)
+
+3. **Add to DigitalOcean:**
+   - Go to [DigitalOcean Control Panel](https://cloud.digitalocean.com/account/security)
+   - Navigate to **Account** → **Security** → **SSH Keys**
+   - Click **"Add SSH Key"**
+   - Paste your public key content
+   - Name it: `private-ai-deployment`
+   - Click **"Add SSH Key"**
+
+4. **Get your SSH Key ID:**
+   ```bash
+   # Method 1: Using doctl CLI (if installed)
+   doctl compute ssh-key list
+   
+   # Method 2: Using curl
+   curl -X GET \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_DO_TOKEN" \
+     "https://api.digitalocean.com/v2/account/keys"
+   ```
+
+   **Copy the numeric ID** (e.g., `12345678`) - you'll need this for Terraform.
+
+#### **Step 3: Configure GitHub Secrets**
+
+1. **Get your private key content:**
+   ```bash
+   cat ~/.ssh/private-ai
+   ```
+
+2. **Copy the entire content** including `-----BEGIN` and `-----END` lines
+
+3. **Add to GitHub Secrets:**
+   - Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+   - Click **"New repository secret"**
+   - Name: `SSH_PRIVATE_KEY`
+   - Value: Paste the entire private key content
+   - Click **"Add secret"**
+
+#### **Step 4: Update Terraform Configuration**
+
+Edit `terraform/main.tf` and replace the SSH key ID:
+
+```hcl
+resource "digitalocean_droplet" "private_ai_server" {
+  # Replace with your SSH key ID from Step 2
+  ssh_keys = ["12345678"]  # ← Replace this number
+  # ... rest of configuration
+}
+```
+
+#### **🔒 Security Best Practices**
+
+- **✅ Never commit private keys to Git**
+- **✅ Use unique keys for each project**
+- **✅ Store private keys securely**
+- **✅ Regularly rotate SSH keys**
+- **❌ Don't share private key content**
+- **❌ Don't reuse personal SSH keys**
+
+#### **🛠️ Troubleshooting SSH Setup**
+
+| Issue | Solution |
+|-------|----------|
+| `Permission denied (publickey)` | Verify key is added to DigitalOcean and ID is correct |
+| `Bad permissions` error | Fix permissions: `chmod 600 ~/.ssh/private-ai` |
+| Key not found in DO | Re-upload public key to DigitalOcean account |
+| GitHub secret not working | Ensure entire private key is copied, including headers |
+
+#### **✅ Verification Commands**
+
+```bash
+# Test SSH connection to DigitalOcean (after deployment)
+ssh -i ~/.ssh/private-ai root@YOUR_DROPLET_IP
+
+# Check key permissions
+ls -la ~/.ssh/private-ai*
+
+# Verify public key format
+ssh-keygen -l -f ~/.ssh/private-ai.pub
+```
+
 ### **1. Fork & Configure**
 
 ```bash
