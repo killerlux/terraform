@@ -35,6 +35,8 @@ resource "digitalocean_droplet" "private_ai_server" {
               apt-get update -y
               apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
               usermod -aG docker ubuntu
+              systemctl restart docker
+              sleep 10
               EOF
 }
 
