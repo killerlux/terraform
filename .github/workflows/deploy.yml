@@ -84,5 +84,5 @@ jobs:
               echo "Deployment complete."
             else
               echo "Executing custom command: ${{ github.event.inputs.command }}"
-              ${{ github.event.inputs.command }}
+              /usr/bin/docker ${{ github.event.inputs.command }}
             fi
