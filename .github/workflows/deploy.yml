@@ -74,7 +74,7 @@ jobs:
               
               cd /root
               echo "Starting docker services..."
-              /usr/local/bin/docker-compose up -d
+              docker compose up -d
               
               echo "Waiting for services to start..."
               sleep 30
