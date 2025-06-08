@@ -28,10 +28,7 @@ resource "digitalocean_droplet" "private_ai_server" {
   # Script minimaliste, Docker sera installé par le workflow
   user_data = <<-EOF
               #!/bin/bash
-              apt-get update -y
-              ufw allow ssh
-              ufw allow 5678/tcp
-              ufw --force enable
+              # Ne rien faire ici pour l'instant, tout est géré par le workflow
               EOF
 }
 
