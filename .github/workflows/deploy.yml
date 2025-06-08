@@ -95,6 +95,9 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Reload shell to ensure all binaries are in PATH
+            source /root/.bashrc
+
             export DEBIAN_FRONTEND=noninteractive
             apt-get install -y git
             GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone https://github.com/${{ github.repository }}.git /root/private-ai
@@ -107,6 +110,9 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Reload shell to ensure Docker is in PATH
+            source /root/.bashrc
+
             cd /root/private-ai
             
             # Create .env file for Docker Compose
