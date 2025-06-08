@@ -50,35 +50,60 @@ jobs:
           echo "Waiting for 60 seconds for the server to boot up..."
           sleep 60
 
-      - name: Install Docker Engine and Compose
+      - name: Install Docker Engine and Compose (Robust Method)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ needs.build.outputs.droplet_ip }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e  # Exit on any error
             export DEBIAN_FRONTEND=noninteractive
-            # Add Docker's official GPG key:
+            
+            echo "=== PHASE 1: System Update ==="
             apt-get update
-            apt-get install -y ca-certificates curl
+            apt-get upgrade -y
+            
+            echo "=== PHASE 2: Install Prerequisites ==="
+            apt-get install -y \
+                ca-certificates \
+                curl \
+                gnupg \
+                lsb-release \
+                software-properties-common \
+                apt-transport-https
+            
+            echo "=== PHASE 3: Add Docker GPG Key ==="
             install -m 0755 -d /etc/apt/keyrings
             curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
             chmod a+r /etc/apt/keyrings/docker.asc
-
-            # Add the repository to Apt sources:
+            
+            echo "=== PHASE 4: Add Docker Repository ==="
             echo \
               "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
               $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
               tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            echo "=== PHASE 5: Update Package Index ==="
             apt-get update
-
-            echo "Installing Docker packages..."
-            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-            echo "Verifying installation..."
+            
+            echo "=== PHASE 6: Install Docker Packages ==="
+            apt-get install -y \
+                docker-ce \
+                docker-ce-cli \
+                containerd.io \
+                docker-buildx-plugin \
+                docker-compose-plugin
+            
+            echo "=== PHASE 7: Start and Enable Docker ==="
+            systemctl start docker
+            systemctl enable docker
+            
+            echo "=== PHASE 8: Verify Installation ==="
             docker --version
             docker compose version
-            echo "Docker and Docker Compose installed successfully."
+            
+            echo "=== DOCKER INSTALLATION SUCCESSFUL ==="
 
       - name: Save Droplet IP as artifact
         run: |
@@ -95,13 +120,19 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Reload shell to ensure all binaries are in PATH
-            source /root/.bashrc
-
+            set -e  # Exit on any error
+            
+            echo "=== Installing Git ==="
             export DEBIAN_FRONTEND=noninteractive
             apt-get install -y git
+            
+            echo "=== Cloning Repository ==="
+            if [ -d "/root/private-ai" ]; then
+                rm -rf /root/private-ai
+            fi
             GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone https://github.com/${{ github.repository }}.git /root/private-ai
-            cd /root/private-ai
+            
+            echo "=== Repository cloned successfully ==="
 
       - name: Deploy Docker Stack on Droplet
         uses: appleboy/ssh-action@master
@@ -110,31 +141,38 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Reload shell to ensure Docker is in PATH
-            source /root/.bashrc
-
+            set -e  # Exit on any error
+            
             cd /root/private-ai
             
-            # Create .env file for Docker Compose
+            echo "=== Creating Environment Configuration ==="
             echo "N8N_HOST=${{ needs.build.outputs.droplet_ip }}" > .env
-            echo "Created .env file with N8N_HOST"
+            echo "Created .env file with N8N_HOST=${{ needs.build.outputs.droplet_ip }}"
             
-            # Create data directory and set correct permissions for n8n
-            mkdir -p n8n_data
+            echo "=== Setting up Data Directories ==="
+            mkdir -p n8n_data ollama_data chroma_data
             chown -R 1000:1000 n8n_data
-            echo "Set permissions for n8n data directory"
+            echo "Data directories created with correct permissions"
 
             if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.command }}" = "deploy" ]; then
-              echo "Starting docker services..."
+              echo "=== Starting Docker Services ==="
+              docker compose down || true  # Stop existing services if any
               docker compose up -d
               
-              echo "Waiting for services to start..."
+              echo "=== Waiting for Services to Start ==="
               sleep 30
-
-              echo "Pulling Llama3 model in Ollama..."
-              docker exec ollama_service ollama pull llama3:8b
-              echo "Deployment complete."
+              
+              echo "=== Verifying Services Status ==="
+              docker compose ps
+              
+              echo "=== Pulling Llama3 Model in Background ==="
+              nohup docker exec ollama_service ollama pull llama3:8b > /tmp/llama_pull.log 2>&1 &
+              
+              echo "=== DEPLOYMENT COMPLETE ==="
+              echo "n8n is accessible at: http://${{ needs.build.outputs.droplet_ip }}:5678"
+              echo "ChromaDB is accessible at: http://${{ needs.build.outputs.droplet_ip }}:8000"
+              echo "Ollama is accessible at: http://${{ needs.build.outputs.droplet_ip }}:11434"
             else
-              echo "Executing custom command: ${{ github.event.inputs.command }}"
+              echo "=== Executing Custom Command ==="
               docker compose ${{ github.event.inputs.command }}
             fi
