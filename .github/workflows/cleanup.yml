@@ -1,0 +1,26 @@
+name: Manual DO Droplet Cleanup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup Droplets
+        run: |
+          DROPLETS=$(curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" "https://api.digitalocean.com/v2/droplets?name=private-ai-server-01&per_page=200")
+          echo "Droplets found: $DROPLETS"
+          
+          DROPLET_IDS=$(echo "$DROPLETS" | jq -r '.droplets[] | .id')
+          
+          if [ -z "$DROPLET_IDS" ]; then
+            echo "No droplets named 'private-ai-server-01' found to delete."
+            exit 0
+          fi
+
+          echo "Deleting droplets with IDs: $DROPLET_IDS"
+          for id in $DROPLET_IDS; do
+            echo "Deleting droplet $id"
+            curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" "https://api.digitalocean.com/v2/droplets/$id"
+          done 

@@ -30,7 +30,12 @@ jobs:
         id: terraform_apply
         run: |
           cd terraform
+          
+          echo "Destroying existing infrastructure first..."
           terraform init
+          terraform destroy -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}" || echo "No existing infrastructure to destroy."
+
+          echo "Applying new infrastructure..."
           terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
           
           DROPLET_IP=$(terraform output -json | jq -r '.droplet_ip_address.value')
