@@ -58,6 +58,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "Installing Docker..."
+            export DEBIAN_FRONTEND=noninteractive
             apt-get update -y
             apt-get install -y ca-certificates curl
             install -m 0755 -d /etc/apt/keyrings
@@ -78,6 +79,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            export DEBIAN_FRONTEND=noninteractive
             apt-get install -y git
             git clone https://github.com/${{ github.repository }}.git /root/private-ai
             cd /root/private-ai
