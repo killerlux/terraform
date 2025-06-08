@@ -69,14 +69,20 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Pausing for manual inspection. SSH into ${{ needs.build.outputs.droplet_ip }} as root."
-            echo "The machine will be destroyed in 10 minutes."
-            sleep 600
+            if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.command }}" = "deploy" ]; then
+              export N8N_HOST=${{ needs.build.outputs.droplet_ip }}
+              
+              cd /root
+              echo "Starting docker services..."
+              /usr/bin/docker compose up -d
+              
+              echo "Waiting for services to start..."
+              sleep 30
 
-      - name: Save Droplet IP as artifact
-        run: |
-          echo ${{ needs.build.outputs.droplet_ip }} > droplet_ip.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: droplet-ip
-          path: droplet_ip.txt
+              echo "Pulling Llama3 model in Ollama..."
+              /usr/bin/docker exec ollama_service ollama pull llama3:8b
+              echo "Deployment complete."
+            else
+              echo "Executing custom command: ${{ github.event.inputs.command }}"
+              /usr/bin/docker ${{ github.event.inputs.command }}
+            fi
