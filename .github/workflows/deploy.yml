@@ -18,6 +18,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
+          terraform_wrapper: false
 
       - name: Authenticate to DigitalOcean & Run Terraform
         id: terraform_apply
@@ -26,7 +27,7 @@ jobs:
           terraform init
           terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
           
-          DROPLET_IP=$(terraform output -raw droplet_ip_address)
+          DROPLET_IP=$(terraform output -json | jq -r '.droplet_ip_address.value')
           echo "droplet_ip=$DROPLET_IP" >> $GITHUB_OUTPUT
 
   deploy:
