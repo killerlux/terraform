@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Document AI - Portfolio Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white mb-4">
+                <i class="fas fa-robot text-blue-400"></i> Private Document AI
+            </h1>
+            <p class="text-xl text-gray-300 max-w-2xl mx-auto">
+                🔒 Secure, Private AI Document Processing • Built by 
+                <a href="https://www.linkedin.com/in/aymen-kouskoussi/" target="_blank" class="text-blue-400 hover:text-blue-300">
+                    Aymen Kouskoussi
+                </a>
+            </p>
+        </div>
+
+        <!-- System Status -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
+            <h2 class="text-2xl font-semibold text-white mb-4">
+                <i class="fas fa-server text-green-400"></i> Live System Status
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-green-300">n8n Orchestration</span>
+                        <span class="text-green-400"><i class="fas fa-circle text-xs"></i> Online</span>
+                    </div>
+                </div>
+                <div class="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-blue-300">Ollama LLM (Llama3)</span>
+                        <span class="text-blue-400"><i class="fas fa-circle text-xs"></i> Ready</span>
+                    </div>
+                </div>
+                <div class="bg-purple-500/20 border border-purple-500/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-purple-300">ChromaDB Vector Store</span>
+                        <span class="text-purple-400"><i class="fas fa-circle text-xs"></i> Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Features -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h3 class="text-xl font-semibold text-white mb-4">
+                    <i class="fas fa-shield-alt text-green-400"></i> Security First
+                </h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ 100% Private - No data leaves your infrastructure</li>
+                    <li>✅ Self-hosted LLM - No external API dependencies</li>
+                    <li>✅ Automated security hardening</li>
+                    <li>✅ Enterprise-grade encryption</li>
+                </ul>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h3 class="text-xl font-semibold text-white mb-4">
+                    <i class="fas fa-rocket text-blue-400"></i> Production Ready
+                </h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>🚀 One-click deployment with GitHub Actions</li>
+                    <li>📊 Auto-scaling infrastructure with Terraform</li>
+                    <li>🔄 Automated workflow orchestration</li>
+                    <li>💰 Cost-optimized with auto-cleanup</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Demo Section -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
+            <h3 class="text-xl font-semibold text-white mb-4">
+                <i class="fas fa-play-circle text-yellow-400"></i> Portfolio Demonstration
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-white font-semibold mb-2">Live Features:</h4>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>📄 Document ingestion (PDF, TXT, DOCX)</li>
+                        <li>🧠 Intelligent Q&A with context</li>
+                        <li>⚡ Vector similarity search</li>
+                        <li>🔄 Real-time processing workflows</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-semibold mb-2">Technologies:</h4>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>🐳 Docker containerization</li>
+                        <li>☁️ DigitalOcean cloud infrastructure</li>
+                        <li>🤖 Llama3 8B local LLM</li>
+                        <li>📊 ChromaDB vector database</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact & Action -->
+        <div class="text-center">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                <h3 class="text-2xl font-semibold text-white mb-4">
+                    Interested in This Solution?
+                </h3>
+                <p class="text-gray-300 mb-6">
+                    Custom AI document processing solutions for your business needs.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a href="https://www.linkedin.com/in/aymen-kouskoussi/" target="_blank" 
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fab fa-linkedin mr-2"></i> Connect on LinkedIn
+                    </a>
+                    <a href="https://github.com/killerlux/terraform" target="_blank"
+                       class="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fab fa-github mr-2"></i> View Source Code
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-8 text-gray-400">
+            <p class="text-sm">
+                <i class="fas fa-code text-blue-400"></i>
+                Built with modern DevOps practices • Terraform • GitHub Actions • Docker
+            </p>
+        </div>
+    </div>
+</body>
+</html> 
