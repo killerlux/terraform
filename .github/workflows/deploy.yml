@@ -4,73 +4,98 @@ on:
   push:
     branches:
       - main
+    paths:
+      # Only trigger on infrastructure or core application changes
+      - 'terraform/**'
+      - 'docker-compose.yml'
+      - 'n8n_workflows/**'
+      - '.github/workflows/**'
+      # Ignore documentation changes
+      - '!README.md'
+      - '!*.md'
+      - '!docs/**'
+      - '!client-interface.html'
+      - '!cost-analysis.md'
+      - '!wiki/**'
   workflow_dispatch:
     inputs:
       command:
-        description: 'Optional command to run on the server'
-        required: false
+        description: 'Action to perform'
+        required: true
         default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - restart-services
+          - update-workflows
+          - cleanup-all
+      force_rebuild:
+        description: 'Force complete rebuild (destroys server)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  auto-cleanup:
+  check-action:
     runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.determine.outputs.action }}
+      skip_cleanup: ${{ steps.determine.outputs.skip_cleanup }}
+    steps:
+      - name: Determine deployment action
+        id: determine
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "action=${{ github.event.inputs.command }}" >> $GITHUB_OUTPUT
+            if [[ "${{ github.event.inputs.force_rebuild }}" == "true" || "${{ github.event.inputs.command }}" == "cleanup-all" ]]; then
+              echo "skip_cleanup=false" >> $GITHUB_OUTPUT
+            else
+              echo "skip_cleanup=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Check what files were changed
+            echo "action=smart-deploy" >> $GITHUB_OUTPUT
+            echo "skip_cleanup=true" >> $GITHUB_OUTPUT
+          fi
+
+  conditional-cleanup:
+    runs-on: ubuntu-latest
+    needs: check-action
+    if: needs.check-action.outputs.skip_cleanup == 'false'
     steps:
       - name: Auto-Cleanup Old Servers
         run: |
-          echo "🧹 AUTO-CLEANUP: Removing old servers to maintain cost efficiency..."
+          echo "🧹 CLEANUP TRIGGERED: Removing existing servers..."
           
           RESPONSE=$(curl -s -X GET \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" \
             "https://api.digitalocean.com/v2/droplets?per_page=200")
           
-          echo "📊 Current Droplets Inventory:"
+          echo "📊 Current Droplets:"
           if echo "$RESPONSE" | jq -e '.droplets | length > 0' > /dev/null; then
-            echo "$RESPONSE" | jq -r '.droplets[] | "🖥️ \(.name) (ID: \(.id)) - \(.status) - $\(.size.price_monthly)/month"'
+            echo "$RESPONSE" | jq -r '.droplets[] | "🖥️ \(.name) (ID: \(.id)) - \(.status)"'
             
-            TOTAL_COST=$(echo "$RESPONSE" | jq '[.droplets[].size.price_monthly] | add // 0')
-            TOTAL_COUNT=$(echo "$RESPONSE" | jq '.droplets | length')
-            echo "💰 Current Monthly Cost: \$$TOTAL_COST"
-            echo "📈 Total Servers: $TOTAL_COUNT"
+            OLD_IDS=$(echo "$RESPONSE" | jq -r '.droplets[].id')
+            for id in $OLD_IDS; do
+              echo "🗑️ Deleting droplet ID: $id"
+              curl -s -X DELETE \
+                -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" \
+                "https://api.digitalocean.com/v2/droplets/$id"
+            done
             
-            if [ "$TOTAL_COUNT" -gt 0 ]; then
-              echo ""
-              echo "🎯 COST OPTIMIZATION: Cleaning up ALL existing servers..."
-              echo "💡 New server will be created fresh for maximum reliability"
-              
-              # Delete ALL existing droplets for cost optimization
-              OLD_IDS=$(echo "$RESPONSE" | jq -r '.droplets[].id')
-              
-              for id in $OLD_IDS; do
-                DROPLET_INFO=$(echo "$RESPONSE" | jq -r --arg id "$id" '.droplets[] | select(.id == ($id | tonumber)) | "\(.name)"')
-                echo "🗑️ Deleting: $DROPLET_INFO (ID: $id)"
-                
-                DELETE_RESPONSE=$(curl -s -w "%{http_code}" -X DELETE \
-                  -H "Content-Type: application/json" \
-                  -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" \
-                  "https://api.digitalocean.com/v2/droplets/$id")
-                
-                if [[ "$DELETE_RESPONSE" == *"204"* ]]; then
-                  echo "✅ Successfully deleted $DROPLET_INFO"
-                else
-                  echo "❌ Failed to delete $DROPLET_INFO: $DELETE_RESPONSE"
-                fi
-              done
-              
-              echo "⏳ Waiting 30 seconds for cleanup to complete..."
-              sleep 30
-            fi
+            echo "⏳ Waiting for cleanup..."
+            sleep 30
           else
-            echo "✅ No existing servers found. Starting fresh deployment."
+            echo "✅ No servers to clean up"
           fi
-          
-          echo "🎯 OPTIMIZATION COMPLETE: Ready for fresh deployment!"
 
-  build:
+  smart-deploy:
     runs-on: ubuntu-latest
-    needs: auto-cleanup
+    needs: [check-action, conditional-cleanup]
+    if: always() && (needs.conditional-cleanup.result == 'success' || needs.conditional-cleanup.result == 'skipped')
     outputs:
-      droplet_ip: ${{ steps.terraform_apply.outputs.droplet_ip }}
+      droplet_ip: ${{ steps.get_or_create.outputs.droplet_ip }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -81,192 +106,138 @@ jobs:
           terraform_version: 1.5.0
           terraform_wrapper: false
 
-      - name: Deploy Fresh Infrastructure
-        id: terraform_apply
+      - name: Get or Create Infrastructure
+        id: get_or_create
         run: |
           cd terraform
           
-          echo "🚀 DEPLOYING FRESH PRIVATE AI INFRASTRUCTURE..."
-          terraform init
+          # Check if we need to create new infrastructure
+          if [[ "${{ needs.check-action.outputs.action }}" == "cleanup-all" || "${{ needs.check-action.outputs.skip_cleanup }}" == "false" ]]; then
+            echo "🏗️ Creating fresh infrastructure..."
+            terraform init
+            terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
+            DROPLET_IP=$(terraform output -json | jq -r '.droplet_ip_address.value')
+          else
+            echo "🔍 Checking for existing server..."
+            RESPONSE=$(curl -s -X GET \
+              -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_TOKEN }}" \
+              "https://api.digitalocean.com/v2/droplets")
+            
+            EXISTING_IP=$(echo "$RESPONSE" | jq -r '.droplets[] | select(.name | contains("private-ai")) | .networks.v4[] | select(.type=="public") | .ip_address' | head -n1)
+            
+            if [[ "$EXISTING_IP" != "null" && "$EXISTING_IP" != "" ]]; then
+              echo "✅ Using existing server: $EXISTING_IP"
+              DROPLET_IP="$EXISTING_IP"
+            else
+              echo "🏗️ No existing server found, creating new one..."
+              terraform init
+              terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
+              DROPLET_IP=$(terraform output -json | jq -r '.droplet_ip_address.value')
+            fi
+          fi
           
-          # Apply new infrastructure (no destroy needed, cleanup job handled it)
-          echo "🏗️ Creating optimized single-server deployment..."
-          terraform apply -auto-approve -var="do_token=${{ secrets.DIGITALOCEAN_TOKEN }}"
-          
-          DROPLET_IP=$(terraform output -json | jq -r '.droplet_ip_address.value')
           echo "droplet_ip=$DROPLET_IP" >> $GITHUB_OUTPUT
-          
-          echo "✅ Fresh server deployed at: $DROPLET_IP"
+          echo "🎯 Server IP: $DROPLET_IP"
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [check-action, smart-deploy]
     steps:
-      - name: Wait for SSH to be available
+      - name: Wait for SSH availability
         run: |
-          echo "⏳ Waiting for fresh server to boot up..."
-          sleep 60
+          echo "⏳ Ensuring SSH is ready..."
+          for i in {1..10}; do
+            if ssh-keyscan -H ${{ needs.smart-deploy.outputs.droplet_ip }} > /dev/null 2>&1; then
+              echo "✅ SSH is ready"
+              break
+            fi
+            echo "Waiting... ($i/10)"
+            sleep 10
+          done
 
-      - name: Install Docker Engine and Compose (Robust Method)
+      - name: Deploy or Update Services
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ needs.build.outputs.droplet_ip }}
+          host: ${{ needs.smart-deploy.outputs.droplet_ip }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e  # Exit on any error
-            export DEBIAN_FRONTEND=noninteractive
+            set -e
             
-            echo "=== PHASE 1: System Update ==="
-            apt-get update
-            apt-get upgrade -y
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              echo "🐳 Installing Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+              systemctl start docker
+              systemctl enable docker
+            fi
             
-            echo "=== PHASE 2: Install Prerequisites ==="
-            apt-get install -y \
-                ca-certificates \
-                curl \
-                gnupg \
-                lsb-release \
-                software-properties-common \
-                apt-transport-https
-            
-            echo "=== PHASE 3: Add Docker GPG Key ==="
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
-            
-            echo "=== PHASE 4: Add Docker Repository ==="
-            echo \
-              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-              tee /etc/apt/sources.list.d/docker.list > /dev/null
-            
-            echo "=== PHASE 5: Update Package Index ==="
-            apt-get update
-            
-            echo "=== PHASE 6: Install Docker Packages ==="
-            apt-get install -y \
-                docker-ce \
-                docker-ce-cli \
-                containerd.io \
-                docker-buildx-plugin \
-                docker-compose-plugin
-            
-            echo "=== PHASE 7: Start and Enable Docker ==="
-            systemctl start docker
-            systemctl enable docker
-            
-            echo "=== PHASE 8: Verify Installation ==="
-            docker --version
-            docker compose version
-            
-            echo "=== DOCKER INSTALLATION SUCCESSFUL ==="
-
-      - name: Checkout code on Droplet
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ needs.build.outputs.droplet_ip }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e  # Exit on any error
-            
-            echo "=== Installing Git ==="
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get install -y git
-            
-            echo "=== Cloning Repository ==="
+            # Clone or update repository
             if [ -d "/root/private-ai" ]; then
-                rm -rf /root/private-ai
-            fi
-            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone https://github.com/${{ github.repository }}.git /root/private-ai
-            
-            echo "=== Repository cloned successfully ==="
-
-      - name: Deploy Complete AI Stack with Auto-Import
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ needs.build.outputs.droplet_ip }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e  # Exit on any error
-            
-            cd /root/private-ai
-            
-            echo "=== Creating Environment Configuration ==="
-            echo "N8N_HOST=${{ needs.build.outputs.droplet_ip }}" > .env
-            echo "Created .env file with N8N_HOST=${{ needs.build.outputs.droplet_ip }}"
-            
-            echo "=== Setting up Data Directories ==="
-            mkdir -p n8n_data ollama_data chroma_data
-            chown -R 1000:1000 n8n_data
-            echo "Data directories created with correct permissions"
-
-            echo "=== Starting Docker Services ==="
-            docker compose up -d
-            
-            echo "=== Waiting for Services to Initialize ==="
-            sleep 45
-            
-            echo "=== Verifying Services Status ==="
-            docker compose ps
-            
-            echo "=== AUTO-IMPORTING N8N WORKFLOWS ==="
-            if [ -d "n8n_workflows" ]; then
-              echo "📁 Found workflows directory. Setting up auto-import..."
-              mkdir -p n8n_data/.n8n/workflows
-              cp n8n_workflows/*.json n8n_data/.n8n/workflows/
-              chown -R 1000:1000 n8n_data/.n8n/workflows
-              echo "✅ Workflows copied successfully"
-              
-              echo "🔄 Restarting n8n to load workflows..."
-              docker compose restart n8n
-              sleep 20
-              echo "✅ n8n restarted with workflows loaded"
+              echo "🔄 Updating existing deployment..."
+              cd /root/private-ai
+              git pull origin main
             else
-              echo "⚠️ No n8n_workflows directory found"
+              echo "📦 Fresh deployment..."
+              git clone https://github.com/${{ github.repository }}.git /root/private-ai
+              cd /root/private-ai
             fi
             
-            echo "=== AUTO-INSTALLING AI MODEL ==="
-            echo "🤖 Downloading Llama3 model in background..."
-            nohup docker exec ollama_service ollama pull llama3:8b > /tmp/llama_pull.log 2>&1 &
+            # Set environment
+            echo "N8N_HOST=${{ needs.smart-deploy.outputs.droplet_ip }}" > .env
             
-            echo ""
-            echo "🎉 ===== PRIVATE AI DEPLOYMENT COMPLETE ===== 🎉"
-            echo ""
-            echo "🌐 Your Private AI is now accessible at:"
-            echo "   📊 n8n Interface: http://${{ needs.build.outputs.droplet_ip }}:5678"
-            echo "   🧠 ChromaDB API: http://${{ needs.build.outputs.droplet_ip }}:8000"
-            echo "   🤖 Ollama API: http://${{ needs.build.outputs.droplet_ip }}:11434"
-            echo ""
-            echo "✅ Auto-imported workflows:"
-            echo "   📄 Document Ingestion Workflow"
-            echo "   💬 Q&A Chat Workflow"
-            echo ""
-            echo "🤖 AI Model: Llama3-8B installing in background"
-            echo "💰 Monthly Cost: ~$24 (single optimized server)"
-            echo "🔒 100% Private & Secure"
-            echo ""
-            echo "🚀 Ready to use! No manual setup required."
+            # Deploy services based on action
+            case "${{ needs.check-action.outputs.action }}" in
+              "restart-services")
+                echo "🔄 Restarting services..."
+                docker compose restart
+                ;;
+              "update-workflows")
+                echo "📋 Updating n8n workflows..."
+                # Copy workflows and restart n8n
+                docker compose cp n8n_workflows/. n8n_service:/home/node/.n8n/workflows/
+                docker compose restart n8n
+                ;;
+              *)
+                echo "🚀 Full deployment..."
+                docker compose down --remove-orphans || true
+                docker compose up -d
+                
+                echo "⏳ Waiting for services..."
+                sleep 60
+                
+                # Auto-import workflows
+                if [ -d "n8n_workflows" ]; then
+                  echo "📋 Importing n8n workflows..."
+                  docker compose exec -T n8n n8n import:workflow --input=/home/node/.n8n/workflows/ || true
+                fi
+                
+                # Install Llama3 model
+                echo "🤖 Installing Llama3 model..."
+                docker compose exec -d ollama ollama pull llama3:8b
+                ;;
+            esac
+            
+            echo "✅ Deployment completed successfully!"
 
-      - name: Final Status Report
+  summary:
+    runs-on: ubuntu-latest
+    needs: [check-action, smart-deploy, deploy]
+    if: always()
+    steps:
+      - name: Deployment Summary
         run: |
-          echo ""
-          echo "🎯 ===== AUTOMATION COMPLETE ===== 🎯"
-          echo ""
-          echo "✅ What was automated:"
-          echo "   🧹 Old servers automatically cleaned up"
-          echo "   🏗️ Fresh server deployed"
-          echo "   🐳 Docker stack installed"
-          echo "   🔄 All services started"
-          echo "   📁 Workflows auto-imported"
-          echo "   🤖 AI model downloading"
-          echo ""
-          echo "💰 Cost Optimization:"
-          echo "   • Maintains exactly 1 server"
-          echo "   • ~$24/month total cost"
-          echo "   • Maximum performance per dollar"
-          echo ""
-          echo "🎉 Your Private AI is ready!"
-          echo "👉 Access: http://${{ needs.build.outputs.droplet_ip }}:5678"
+          echo "## 🎯 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ needs.check-action.outputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Server IP:** ${{ needs.smart-deploy.outputs.droplet_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Services:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 n8n: http://${{ needs.smart-deploy.outputs.droplet_ip }}:5678" >> $GITHUB_STEP_SUMMARY
+          echo "- 🤖 Ollama: http://${{ needs.smart-deploy.outputs.droplet_ip }}:11434" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 ChromaDB: http://${{ needs.smart-deploy.outputs.droplet_ip }}:8000" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.check-action.outputs.skip_cleanup }}" == "true" ]]; then
+            echo "💡 **Server preserved** - no cleanup performed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🧹 **Fresh deployment** - old servers cleaned up" >> $GITHUB_STEP_SUMMARY
+          fi
