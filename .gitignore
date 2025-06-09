@@ -7,6 +7,18 @@
 .terraform/
 terraform.tfvars
 
+# Clés SSH - SÉCURITÉ CRITIQUE
+n8n
+n8n.pub
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+private-ai
+private-ai.pub
+
 # Logs et dépendances
 node_modules
 npm-debug.log
