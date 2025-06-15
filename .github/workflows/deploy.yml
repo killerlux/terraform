@@ -214,8 +214,28 @@ jobs:
                 fi
                 
                 # Install Llama3 model
-                echo "🤖 Installing Llama3 model..."
-                docker compose exec -d ollama ollama pull llama3:8b
+                echo "🤖 Installing Mistral model..."
+                docker compose exec -d ollama ollama pull mistral
+                
+                # Health checks
+                echo "🔍 Running health checks..."
+                for i in {1..5}; do
+                  if curl -s http://localhost:11434/api/generate -d '{"model":"mistral","prompt":"test"}' > /dev/null; then
+                    echo "✅ Ollama is healthy"
+                    break
+                  fi
+                  echo "Waiting for Ollama... ($i/5)"
+                  sleep 10
+                done
+                
+                for i in {1..5}; do
+                  if curl -s http://localhost:8000/api/v1/collections > /dev/null; then
+                    echo "✅ ChromaDB is healthy"
+                    break
+                  fi
+                  echo "Waiting for ChromaDB... ($i/5)"
+                  sleep 10
+                done
                 ;;
             esac
             
@@ -235,6 +255,20 @@ jobs:
           echo "- 📊 n8n: http://${{ needs.smart-deploy.outputs.droplet_ip }}:5678" >> $GITHUB_STEP_SUMMARY
           echo "- 🤖 Ollama: http://${{ needs.smart-deploy.outputs.droplet_ip }}:11434" >> $GITHUB_STEP_SUMMARY
           echo "- 📊 ChromaDB: http://${{ needs.smart-deploy.outputs.droplet_ip }}:8000" >> $GITHUB_STEP_SUMMARY
+          
+          # Check service status
+          echo "**Service Status:**" >> $GITHUB_STEP_SUMMARY
+          if curl -s http://${{ needs.smart-deploy.outputs.droplet_ip }}:11434/api/generate -d '{"model":"mistral","prompt":"test"}' > /dev/null; then
+            echo "✅ Ollama: Running" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Ollama: Not responding" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if curl -s http://${{ needs.smart-deploy.outputs.droplet_ip }}:8000/api/v1/collections > /dev/null; then
+            echo "✅ ChromaDB: Running" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ ChromaDB: Not responding" >> $GITHUB_STEP_SUMMARY
+          fi
           
           if [[ "${{ needs.check-action.outputs.skip_cleanup }}" == "true" ]]; then
             echo "💡 **Server preserved** - no cleanup performed" >> $GITHUB_STEP_SUMMARY
